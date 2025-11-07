@@ -3,21 +3,12 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 
-# Чтение данных БЕЗ заголовков и с указанием имен столбцов
 df = pd.read_csv('results.csv', header=None, names=['method', 'processes', 'matrix_size', 'execution_time'])
-print("Данные:")
-print(df.head())
-print("\nУникальные размеры матриц:", df['matrix_size'].unique())
-print("Уникальные процессы:", df['processes'].unique())
 
-# Вычисление ускорения (speedup)
-# Ускорение = время на 1 процессе / время на p процессах
 speedup_data = []
 
 for matrix_size in df['matrix_size'].unique():
-    # Находим время выполнения на 1 процессе для данного размера матрицы
     time_1proc = df[(df['processes'] == 1) & (df['matrix_size'] == matrix_size)]['execution_time'].values[0]
-    print(f"Размер {matrix_size}: время на 1 процессе = {time_1proc:.4f} сек")
     
     for processes in df['processes'].unique():
         current_data = df[(df['processes'] == processes) & (df['matrix_size'] == matrix_size)]
@@ -37,10 +28,7 @@ for matrix_size in df['matrix_size'].unique():
             })
 
 speedup_df = pd.DataFrame(speedup_data)
-print("\nДанные с ускорением:")
-print(speedup_df)
 
-# 1. График ускорения в зависимости от числа процессов
 plt.figure(figsize=(12, 8))
 
 colors = ['blue', 'red', 'green', 'orange', 'purple']
@@ -53,7 +41,6 @@ for i, matrix_size in enumerate(matrix_sizes):
              color=colors[i % len(colors)],
              label=f'N={matrix_size}')
 
-# Идеальное ускорение (линейное)
 ideal_procs = np.array([1, 4, 9, 16, 25])
 plt.plot(ideal_procs, ideal_procs, 'k--', linewidth=1, label='Идеальное ускорение')
 
@@ -67,7 +54,6 @@ plt.tight_layout()
 plt.savefig('speedup_vs_processes.png', dpi=300, bbox_inches='tight')
 plt.show()
 
-# 2. График времени выполнения в зависимости от размера матрицы
 plt.figure(figsize=(12, 8))
 
 processes_list = sorted(speedup_df['processes'].unique())
@@ -86,7 +72,6 @@ plt.tight_layout()
 plt.savefig('time_vs_matrix_size.png', dpi=300, bbox_inches='tight')
 plt.show()
 
-# 3. Эффективность (efficiency)
 speedup_df['efficiency'] = speedup_df['speedup'] / speedup_df['processes']
 
 plt.figure(figsize=(12, 8))
@@ -110,7 +95,6 @@ plt.tight_layout()
 plt.savefig('efficiency.png', dpi=300, bbox_inches='tight')
 plt.show()
 
-# 4. Тепловая карта ускорения
 pivot_speedup = speedup_df.pivot(index='processes', columns='matrix_size', values='speedup')
 
 plt.figure(figsize=(10, 8))
@@ -123,12 +107,6 @@ plt.tight_layout()
 plt.savefig('speedup_heatmap.png', dpi=300, bbox_inches='tight')
 plt.show()
 
-# 5. Анализ результатов
-print("\n" + "="*50)
-print("АНАЛИЗ РЕЗУЛЬТАТОВ")
-print("="*50)
-
-# Находим лучшую конфигурацию для каждого размера матрицы
 for matrix_size in matrix_sizes:
     subset = speedup_df[speedup_df['matrix_size'] == matrix_size]
     best_config = subset.loc[subset['speedup'].idxmax()]
@@ -138,15 +116,4 @@ for matrix_size in matrix_sizes:
     print(f"  Эффективность: {best_config['efficiency']:.3f}")
     print(f"  Время выполнения: {best_config['execution_time']:.3f} сек")
 
-# Сохранение данных с анализом
 speedup_df.to_csv('results_with_analysis.csv', index=False)
-print(f"\nРезультаты анализа сохранены в 'results_with_analysis.csv'")
-
-# Сводная таблица
-print("\nСводная таблица ускорения:")
-pivot_table = speedup_df.pivot(index='processes', columns='matrix_size', values='speedup')
-print(pivot_table.round(2))
-
-print("\nСводная таблица эффективности:")
-pivot_eff = speedup_df.pivot(index='processes', columns='matrix_size', values='efficiency')
-print(pivot_eff.round(3))
