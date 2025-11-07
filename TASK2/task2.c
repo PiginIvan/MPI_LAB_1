@@ -6,7 +6,7 @@
 
 typedef unsigned long long ull;
 
-/* Вспомогательная функция: выделение памяти для массива double */
+/* Р’СЃРїРѕРјРѕРіР°С‚РµР»СЊРЅР°СЏ С„СѓРЅРєС†РёСЏ: РІС‹РґРµР»РµРЅРёРµ РїР°РјСЏС‚Рё РґР»СЏ РјР°СЃСЃРёРІР° double */
 double* alloc_d(size_t n) {
     double* p = (double*)malloc(n * sizeof(double));
     if (!p) {
@@ -16,14 +16,14 @@ double* alloc_d(size_t n) {
     return p;
 }
 
-/* Заполнение массива случайными числами в диапазоне [-1,1] */
+/* Р—Р°РїРѕР»РЅРµРЅРёРµ РјР°СЃСЃРёРІР° СЃР»СѓС‡Р°Р№РЅС‹РјРё С‡РёСЃР»Р°РјРё РІ РґРёР°РїР°Р·РѕРЅРµ [-1,1] */
 void fill_rand(double* a, size_t n) {
     for (size_t i = 0; i < n; ++i) {
         a[i] = 2.0 * ((double)rand() / RAND_MAX) - 1.0;
     }
 }
 
-/* Умножение матрицы на вектор: построчное распределение */
+/* РЈРјРЅРѕР¶РµРЅРёРµ РјР°С‚СЂРёС†С‹ РЅР° РІРµРєС‚РѕСЂ: РїРѕСЃС‚СЂРѕС‡РЅРѕРµ СЂР°СЃРїСЂРµРґРµР»РµРЅРёРµ */
 double matvec_rows(int n, double* A_root, double* v_root, double* y_root, int rank, int size) {
     int base = n / size;
     int rem = n % size;
@@ -83,7 +83,7 @@ double matvec_rows(int n, double* A_root, double* v_root, double* y_root, int ra
     return local_time;
 }
 
-/* Умножение матрицы на вектор: поколоночное распределение */
+/* РЈРјРЅРѕР¶РµРЅРёРµ РјР°С‚СЂРёС†С‹ РЅР° РІРµРєС‚РѕСЂ: РїРѕРєРѕР»РѕРЅРѕС‡РЅРѕРµ СЂР°СЃРїСЂРµРґРµР»РµРЅРёРµ */
 double matvec_cols(int n, double* A_root, double* v_root, double* y_root, int rank, int size) {
     int base = n / size;
     int rem = n % size;
@@ -155,7 +155,7 @@ double matvec_cols(int n, double* A_root, double* v_root, double* y_root, int ra
     return local_time;
 }
 
-/* Умножение матрицы на вектор: блочное распределение (2D) */
+/* РЈРјРЅРѕР¶РµРЅРёРµ РјР°С‚СЂРёС†С‹ РЅР° РІРµРєС‚РѕСЂ: Р±Р»РѕС‡РЅРѕРµ СЂР°СЃРїСЂРµРґРµР»РµРЅРёРµ (2D) */
 double matvec_blocks(int n, double* A_root, double* v_root, double* y_root, int rank, int size) {
     int prows = 1, pcols = size;
     for (int d = 1; d * d <= size; ++d) {
@@ -317,14 +317,13 @@ double matvec_blocks(int n, double* A_root, double* v_root, double* y_root, int 
     return local_time;
 }
 
-/* Функция для записи максимального времени в CSV */
+/* Р¤СѓРЅРєС†РёСЏ РґР»СЏ Р·Р°РїРёСЃРё РјР°РєСЃРёРјР°Р»СЊРЅРѕРіРѕ РІСЂРµРјРµРЅРё РІ CSV */
 void write_max_time_to_csv(const char* algorithm, int world_size, int n, double max_time, int world_rank) {
-    if (world_rank != 0) return; // Только процесс 0 записывает в файл
+    if (world_rank != 0) return; // Г’Г®Г«ГјГЄГ® ГЇГ°Г®Г¶ГҐГ±Г± 0 Г§Г ГЇГЁГ±Г»ГўГ ГҐГІ Гў ГґГ Г©Г«
 
     FILE* fp;
     errno_t err;
 
-    // Всегда открываем файл для дописывания (без заголовка)
     err = fopen_s(&fp, "result.csv", "a");
 
     if (err == 0 && fp != NULL) {
@@ -333,18 +332,18 @@ void write_max_time_to_csv(const char* algorithm, int world_size, int n, double 
     }
 }
 
-/* Функция для запуска алгоритма и записи максимального времени */
+/* Р¤СѓРЅРєС†РёСЏ РґР»СЏ Р·Р°РїСѓСЃРєР° Р°Р»РіРѕСЂРёС‚РјР° Рё Р·Р°РїРёСЃРё РјР°РєСЃРёРјР°Р»СЊРЅРѕРіРѕ РІСЂРµРјРµРЅРё */
 void run_algorithm_max_time(const char* name, double (*matvec_func)(int, double*, double*, double*, int, int),
     int n, double* A_root, double* v_root, double* y_root,
     int world_rank, int world_size) {
 
     double local_time = matvec_func(n, A_root, v_root, y_root, world_rank, world_size);
 
-    // Находим максимальное время среди всех процессов
+    // РќР°С…РѕРґРёРј РјР°РєСЃРёРјР°Р»СЊРЅРѕРµ РІСЂРµРјСЏ СЃСЂРµРґРё РІСЃРµС… РїСЂРѕС†РµСЃСЃРѕРІ
     double max_time;
     MPI_Reduce(&local_time, &max_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
 
-    // Процесс 0 записывает максимальное время в CSV
+    // РџСЂРѕС†РµСЃСЃ 0 Р·Р°РїРёСЃС‹РІР°РµС‚ РјР°РєСЃРёРјР°Р»СЊРЅРѕРµ РІСЂРµРјСЏ РІ CSV
     if (world_rank == 0) {
         write_max_time_to_csv(name, world_size, n, max_time, world_rank);
         printf("Algorithm: %s, NP: %d, N: %d, Max Time: %.9f sec\n",
@@ -394,7 +393,7 @@ int main(int argc, char* argv[]) {
         v_root = alloc_d(n);
     }
 
-    // Запуск выбранного алгоритма
+    // Р—Р°РїСѓСЃРє РІС‹Р±СЂР°РЅРЅРѕРіРѕ Р°Р»РіРѕСЂРёС‚РјР°
     if (strcmp(algo, "rows") == 0) {
         run_algorithm_max_time("rows", matvec_rows, n, A_root, v_root, y_root, world_rank, world_size);
     }
@@ -429,4 +428,5 @@ int main(int argc, char* argv[]) {
 
     MPI_Finalize();
     return 0;
+
 }
