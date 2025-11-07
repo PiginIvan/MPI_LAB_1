@@ -1,100 +1,152 @@
-import sys
 import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
 
-if len(sys.argv) < 2:
-    print("Usage: python graphs.py results.csv")
-    sys.exit(1)
+# Чтение данных БЕЗ заголовков и с указанием имен столбцов
+df = pd.read_csv('results.csv', header=None, names=['method', 'processes', 'matrix_size', 'execution_time'])
+print("Данные:")
+print(df.head())
+print("\nУникальные размеры матриц:", df['matrix_size'].unique())
+print("Уникальные процессы:", df['processes'].unique())
 
-fn = sys.argv[1]
+# Вычисление ускорения (speedup)
+# Ускорение = время на 1 процессе / время на p процессах
+speedup_data = []
 
-cols = ['N','P','T_par','T_seq','Speedup','Efficiency']
-df = pd.read_csv(fn, header=None, names=cols, dtype=str)
+for matrix_size in df['matrix_size'].unique():
+    # Находим время выполнения на 1 процессе для данного размера матрицы
+    time_1proc = df[(df['processes'] == 1) & (df['matrix_size'] == matrix_size)]['execution_time'].values[0]
+    print(f"Размер {matrix_size}: время на 1 процессе = {time_1proc:.4f} сек")
+    
+    for processes in df['processes'].unique():
+        current_data = df[(df['processes'] == processes) & (df['matrix_size'] == matrix_size)]
+        if len(current_data) > 0:
+            current_time = current_data['execution_time'].values[0]
+            
+            if processes == 1:
+                speedup = 1.0
+            else:
+                speedup = time_1proc / current_time
+            
+            speedup_data.append({
+                'matrix_size': matrix_size,
+                'processes': processes,
+                'speedup': speedup,
+                'execution_time': current_time
+            })
 
-df['N'] = pd.to_numeric(df['N'], errors='coerce').astype('Int64')
-df['P'] = pd.to_numeric(df['P'], errors='coerce').astype('Int64')
-df['T_par'] = pd.to_numeric(df['T_par'], errors='coerce').astype(float)
-df['T_seq'] = pd.to_numeric(df['T_seq'], errors='coerce').astype(float)
-df['Speedup'] = pd.to_numeric(df['Speedup'], errors='coerce').astype(float)
-df['Efficiency'] = pd.to_numeric(df['Efficiency'], errors='coerce').astype(float)
+speedup_df = pd.DataFrame(speedup_data)
+print("\nДанные с ускорением:")
+print(speedup_df)
 
-before = len(df)
-df = df.dropna(subset=['N','P','T_par'])
-after = len(df)
-if before != after:
-    print(f"Warning: dropped {before-after} invalid rows")
+# 1. График ускорения в зависимости от числа процессов
+plt.figure(figsize=(12, 8))
 
-agg = df.groupby(['N','P'], as_index=False).median()
+colors = ['blue', 'red', 'green', 'orange', 'purple']
+matrix_sizes = sorted(speedup_df['matrix_size'].unique())
 
-Ns = sorted(agg['N'].unique())
-Ps = sorted(agg['P'].unique())
+for i, matrix_size in enumerate(matrix_sizes):
+    subset = speedup_df[speedup_df['matrix_size'] == matrix_size]
+    plt.plot(subset['processes'], subset['speedup'], 
+             marker='o', linewidth=2, markersize=8, 
+             color=colors[i % len(colors)],
+             label=f'N={matrix_size}')
 
-print("Found matrix sizes N:", Ns)
-print("Found process counts P:", Ps)
+# Идеальное ускорение (линейное)
+ideal_procs = np.array([1, 4, 9, 16, 25])
+plt.plot(ideal_procs, ideal_procs, 'k--', linewidth=1, label='Идеальное ускорение')
 
-plt.figure(figsize=(8,6))
-for p in Ps:
-    sub = agg[agg['P']==p].sort_values('N')
-    if sub.empty: continue
-    plt.plot(sub['N'], sub['T_par'], marker='o', label=f'P={p}')
-plt.xlabel('Matrix size N')
-plt.ylabel('Parallel time T_par (s)')
-plt.title('T_par vs N (lines = different P)')
-plt.grid(True, which='both', ls='--', alpha=0.5)
+plt.xlabel('Количество процессов', fontsize=12)
+plt.ylabel('Ускорение', fontsize=12)
+plt.title('Ускорение алгоритма Кэннона в зависимости от числа процессов', fontsize=14)
+plt.grid(True, alpha=0.3)
+plt.legend()
+plt.xticks([1, 4, 9, 16, 25])
+plt.tight_layout()
+plt.savefig('speedup_vs_processes.png', dpi=300, bbox_inches='tight')
+plt.show()
+
+# 2. График времени выполнения в зависимости от размера матрицы
+plt.figure(figsize=(12, 8))
+
+processes_list = sorted(speedup_df['processes'].unique())
+for processes in processes_list:
+    subset = speedup_df[speedup_df['processes'] == processes]
+    plt.plot(subset['matrix_size'], subset['execution_time'], 
+             marker='s', linewidth=2, markersize=6,
+             label=f'p={processes}')
+
+plt.xlabel('Размер матрицы (N)', fontsize=12)
+plt.ylabel('Время выполнения (сек)', fontsize=12)
+plt.title('Время выполнения алгоритма Кэннона', fontsize=14)
+plt.grid(True, alpha=0.3)
 plt.legend()
 plt.tight_layout()
-plt.savefig('time_vs_N.png', dpi=150)
-print("Saved: time_vs_N.png")
+plt.savefig('time_vs_matrix_size.png', dpi=300, bbox_inches='tight')
+plt.show()
 
-plt.figure(figsize=(8,6))
-markers = ['o','s','^','d','v','p','*','h','x','+']
-for i,n in enumerate(Ns):
-    sub = agg[agg['N']==n].sort_values('P')
-    if sub.empty: continue
-    plt.plot(sub['P'], sub['Speedup'], marker=markers[i%len(markers)], linestyle='-', label=f'N={n}')
-x = np.array(Ps)
-plt.plot(x, x, '--', color='gray', label='ideal S=P')
-plt.xscale('log', base=2)
-plt.xlabel('Processes P (log2 scale)')
-plt.ylabel('Speedup S(P)')
-plt.title('Speedup vs P for different N')
-plt.grid(True, which='both', ls='--', alpha=0.5)
+# 3. Эффективность (efficiency)
+speedup_df['efficiency'] = speedup_df['speedup'] / speedup_df['processes']
+
+plt.figure(figsize=(12, 8))
+
+for i, matrix_size in enumerate(matrix_sizes):
+    subset = speedup_df[speedup_df['matrix_size'] == matrix_size]
+    plt.plot(subset['processes'], subset['efficiency'], 
+             marker='^', linewidth=2, markersize=8,
+             color=colors[i % len(colors)],
+             label=f'N={matrix_size}')
+
+plt.axhline(y=1.0, color='red', linestyle='--', alpha=0.7, label='Идеальная эффективность')
+plt.xlabel('Количество процессов', fontsize=12)
+plt.ylabel('Эффективность', fontsize=12)
+plt.title('Эффективность алгоритма Кэннона', fontsize=14)
+plt.grid(True, alpha=0.3)
 plt.legend()
+plt.ylim(0, 1.1)
+plt.xticks([1, 4, 9, 16, 25])
 plt.tight_layout()
-plt.savefig('speedup_vs_P_per_N.png', dpi=150)
-print("Saved: speedup_vs_P_per_N.png")
+plt.savefig('efficiency.png', dpi=300, bbox_inches='tight')
+plt.show()
 
-plt.figure(figsize=(8,6))
-for i,p in enumerate(Ps):
-    sub = agg[agg['P']==p].sort_values('N')
-    if sub.empty: continue
-    plt.plot(sub['N'], sub['Speedup'], marker=markers[i%len(markers)], linestyle='-', label=f'P={p}')
-plt.xlabel('Matrix size N')
-plt.ylabel('Speedup S')
-plt.title('Speedup vs N for different P')
-plt.grid(True, which='both', ls='--', alpha=0.5)
-plt.legend()
+# 4. Тепловая карта ускорения
+pivot_speedup = speedup_df.pivot(index='processes', columns='matrix_size', values='speedup')
+
+plt.figure(figsize=(10, 8))
+sns.heatmap(pivot_speedup, annot=True, fmt='.2f', cmap='RdYlGn', 
+            cbar_kws={'label': 'Ускорение'})
+plt.title('Тепловая карта ускорения алгоритма Кэннона', fontsize=14)
+plt.xlabel('Размер матрицы')
+plt.ylabel('Количество процессов')
 plt.tight_layout()
-plt.savefig('speedup_vs_N_per_P.png', dpi=150)
-print("Saved: speedup_vs_N_per_P.png")
+plt.savefig('speedup_heatmap.png', dpi=300, bbox_inches='tight')
+plt.show()
 
-plt.figure(figsize=(8,6))
-for i,n in enumerate(Ns):
-    sub = agg[agg['N']==n].sort_values('P')
-    if sub.empty: continue
-    plt.plot(sub['P'], sub['Efficiency'], marker=markers[i%len(markers)], linestyle='-', label=f'N={n}')
-plt.xscale('log', base=2)
-plt.xlabel('Processes P (log2 scale)')
-plt.ylabel('Efficiency E(P)')
-plt.title('Efficiency vs P for different N')
-plt.grid(True, which='both', ls='--', alpha=0.5)
-plt.legend()
-plt.tight_layout()
-plt.savefig('efficiency_vs_P.png', dpi=150)
-print("Saved: efficiency_vs_P.png")
+# 5. Анализ результатов
+print("\n" + "="*50)
+print("АНАЛИЗ РЕЗУЛЬТАТОВ")
+print("="*50)
 
-print("\nSummary (N, P, T_par, Speedup, Efficiency):")
-print(agg[['N','P','T_par','Speedup','Efficiency']].to_string(index=False))
+# Находим лучшую конфигурацию для каждого размера матрицы
+for matrix_size in matrix_sizes:
+    subset = speedup_df[speedup_df['matrix_size'] == matrix_size]
+    best_config = subset.loc[subset['speedup'].idxmax()]
+    
+    print(f"\nРазмер матрицы {matrix_size}:")
+    print(f"  Лучшее ускорение: {best_config['speedup']:.2f}x (при {best_config['processes']} процессах)")
+    print(f"  Эффективность: {best_config['efficiency']:.3f}")
+    print(f"  Время выполнения: {best_config['execution_time']:.3f} сек")
 
-print("\nDone.")
+# Сохранение данных с анализом
+speedup_df.to_csv('results_with_analysis.csv', index=False)
+print(f"\nРезультаты анализа сохранены в 'results_with_analysis.csv'")
+
+# Сводная таблица
+print("\nСводная таблица ускорения:")
+pivot_table = speedup_df.pivot(index='processes', columns='matrix_size', values='speedup')
+print(pivot_table.round(2))
+
+print("\nСводная таблица эффективности:")
+pivot_eff = speedup_df.pivot(index='processes', columns='matrix_size', values='efficiency')
+print(pivot_eff.round(3))
